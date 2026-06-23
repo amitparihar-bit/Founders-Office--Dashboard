@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Race Control — NRPL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --carbon:#0d0e10;--carbon-2:#16181c;--carbon-3:#1e2127;--carbon-4:#282c34;
+  --paper:#f4f5f7;--paper-mute:#c9cdd4;--ink-dim:#7d828c;--ink-low:#4a4f58;
+  --red:#e10600;--red-dim:#8b0000;--amber:#ffb800;--green:#00d26a;
+  --blue:#0090ff;--purple:#b83dff;--teal:#00c2c7;
+  --rule:#2a2d33;--rule-soft:#1e2127;
+  --task-color:#ffb800;--followup-color:#b83dff;--project-color:#00d26a;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--carbon);color:var(--paper);font-family:'Inter',sans-serif;font-size:15px;line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased;}
+.race-stripe{position:fixed;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--red) 0%,var(--red) 33%,var(--amber) 33%,var(--amber) 66%,var(--green) 66%,var(--green) 100%);z-index:200;}
+.app{display:grid;grid-template-columns:256px 1fr;min-height:100vh;position:relative;z-index:1;}
+/* ── SIDEBAR ── */
+aside{background:var(--carbon-2);border-right:1px solid var(--rule);padding:24px 16px;position:sticky;top:0;height:100vh;overflow-y:auto;}
+aside::-webkit-scrollbar{width:4px;}
+aside::-webkit-scrollbar-thumb{background:var(--carbon-4);border-radius:2px;}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:2px;}
+.brand-mark{width:26px;height:26px;background:var(--red);border-radius:3px;position:relative;overflow:hidden;flex-shrink:0;}
+.brand-mark::before{content:'';position:absolute;inset:0;background:linear-gradient(45deg,#fff 25%,transparent 25%),linear-gradient(-45deg,#fff 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#fff 75%),linear-gradient(-45deg,transparent 75%,#fff 75%);background-size:7px 7px;background-position:0 0,0 3.5px,3.5px -3.5px,-3.5px 0;opacity:.2;}
+.brand-name{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:19px;letter-spacing:.02em;color:var(--paper);text-transform:uppercase;}
+.brand-name span{color:var(--red);}
+.brand-sub{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:24px;padding-left:36px;margin-top:1px;}
+
+/* Section dividers in sidebar */
+.nav-section{margin-bottom:6px;margin-top:18px;}
+.nav-section-header{display:flex;align-items:center;gap:8px;padding:0 4px;margin-bottom:6px;}
+.nav-section-bar{height:2px;width:14px;border-radius:1px;flex-shrink:0;}
+.bar-task{background:var(--task-color);}
+.bar-followup{background:var(--followup-color);}
+.bar-project{background:var(--project-color);}
+.bar-cmd{background:var(--red);}
+.nav-section-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-dim);}
+.nav-section-label em{font-style:normal;color:var(--paper-mute);}
+
+.nav-item{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;margin:1px 0;border-radius:4px;cursor:pointer;color:var(--paper-mute);transition:background .12s,color .12s;user-select:none;border-left:2px solid transparent;}
+.nav-item:hover{background:var(--carbon-3);color:var(--paper);}
+.nav-item.active{background:var(--carbon-3);color:var(--paper);}
+.nav-item.active.type-task{border-left-color:var(--task-color);}
+.nav-item.active.type-followup{border-left-color:var(--followup-color);}
+.nav-item.active.type-project{border-left-color:var(--project-color);}
+.nav-item.active.type-cmd{border-left-color:var(--red);}
+.nav-item-inner{display:flex;flex-direction:column;gap:1px;flex:1;min-width:0;}
+.nav-f1{font-family:'Rajdhani',sans-serif;font-weight:600;font-size:13.5px;letter-spacing:.01em;text-transform:uppercase;}
+.nav-plain{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ink-dim);letter-spacing:.05em;text-transform:uppercase;}
+.nav-item.active .nav-plain{color:var(--paper-mute);}
+.nav-count{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:500;background:var(--carbon-4);color:var(--paper-mute);padding:2px 7px;border-radius:3px;min-width:24px;text-align:center;}
+.nav-item.active .nav-count{color:var(--paper);}
+.nav-item.active.type-task .nav-count{background:var(--task-color);color:var(--carbon);}
+.nav-item.active.type-followup .nav-count{background:var(--followup-color);color:var(--paper);}
+.nav-item.active.type-project .nav-count{background:var(--project-color);color:var(--carbon);}
+.nav-item.active.type-cmd .nav-count{background:var(--red);color:var(--paper);}
+.nav-add-btn{background:none;border:1px solid var(--rule);color:var(--ink-dim);font-size:12px;cursor:pointer;padding:2px 6px;border-radius:3px;line-height:1;margin-left:6px;}
+.nav-add-btn:hover{background:var(--amber);color:var(--carbon);border-color:var(--amber);}
+
+/* ── TOPBAR ── */
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:11px 20px;background:var(--carbon-2);border-bottom:1px solid var(--rule);}
+.telem{display:flex;gap:14px;align-items:center;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);}
+.telem-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);}
+.telem-dot.live{animation:pulse 2s infinite;}
+.telem-dot.syncing{background:var(--amber);box-shadow:0 0 8px var(--amber);animation:pulse 1s infinite;}
+.telem-dot.offline{background:var(--ink-low);box-shadow:none;animation:none;}
+.telem-dot.error{background:var(--red);box-shadow:0 0 8px var(--red);animation:none;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.role-sw{display:flex;gap:2px;background:var(--carbon-3);padding:3px;border-radius:4px;border:1px solid var(--rule);}
+.role-btn{padding:5px 12px;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;border:none;background:transparent;color:var(--ink-dim);border-radius:3px;cursor:pointer;}
+.role-btn.active{background:var(--red);color:var(--paper);}
+.topbar-actions{display:flex;gap:8px;align-items:center;}
+
+/* ── MAIN ── */
+main{padding:24px 36px 60px;max-width:1320px;}
+
+/* ── QUICK CAPTURE ── */
+.qc-bar{background:linear-gradient(90deg,rgba(225,6,0,.08),rgba(225,6,0,.02));border:1px solid rgba(225,6,0,.3);border-radius:6px;padding:11px 16px;display:flex;gap:12px;align-items:center;margin-bottom:20px;}
+.qc-label{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--red);white-space:nowrap;font-weight:700;}
+.qc-input{flex:1;background:transparent;border:none;color:var(--paper);font-family:'Inter',sans-serif;font-size:14px;padding:4px 0;outline:none;}
+.qc-input::placeholder{color:var(--ink-dim);font-style:italic;}
+.qc-hint{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ink-dim);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;}
+.qc-fb{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--green);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;opacity:0;transition:opacity .3s;}
+.qc-fb.show{opacity:1;}
+
+/* ── PAGE HEAD ── */
+.page-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--rule);position:relative;}
+.page-head::after{content:'';position:absolute;bottom:-1px;left:0;width:50px;height:2px;}
+.head-task::after{background:var(--task-color);}
+.head-followup::after{background:var(--followup-color);}
+.head-project::after{background:var(--project-color);}
+.head-cmd::after{background:var(--red);}
+h1{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:38px;letter-spacing:.01em;line-height:1;text-transform:uppercase;}
+h1 .accent-task{color:var(--task-color);}
+h1 .accent-fp{color:var(--followup-color);}
+h1 .accent-proj{color:var(--project-color);}
+h1 .accent-red{color:var(--red);}
+.page-sub{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase;margin-top:5px;}
+.page-meta{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-dim);letter-spacing:.07em;text-align:right;}
+.page-meta .date{color:var(--paper);font-size:11px;font-weight:500;text-transform:uppercase;margin-bottom:2px;}
+
+/* ── STAT CARDS ── */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+.stat{background:var(--carbon-2);border:1px solid var(--rule);border-radius:6px;padding:14px 16px;position:relative;overflow:hidden;}
+.stat::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;}
+.stat.s-amber::before{background:var(--task-color);}
+.stat.s-purple::before{background:var(--followup-color);}
+.stat.s-green::before{background:var(--project-color);}
+.stat.s-red::before{background:var(--red);}
+.stat-lbl{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:8px;}
+.stat-val{font-family:'Rajdhani',sans-serif;font-size:34px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;}
+.sv-amber{color:var(--task-color);}
+.sv-purple{color:var(--followup-color);}
+.sv-green{color:var(--project-color);}
+.sv-red{color:var(--red);}
+.stat-sub{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--ink-dim);margin-top:6px;letter-spacing:.05em;text-transform:uppercase;}
+
+/* ── SUMMARY GRID (Pit Wall) ── */
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;}
+.sum-card{background:var(--carbon-2);border:1px solid var(--rule);border-radius:6px;padding:18px;cursor:pointer;transition:border-color .15s,background .15s;}
+.sum-card:hover{background:var(--carbon-3);}
+.sum-card.sc-task{border-top:2px solid var(--task-color);}
+.sum-card.sc-followup{border-top:2px solid var(--followup-color);}
+.sum-card.sc-project{border-top:2px solid var(--project-color);}
+.sc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+.sc-title{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:17px;text-transform:uppercase;letter-spacing:.02em;}
+.sc-plain{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;margin-top:2px;}
+.sc-plain.t{color:var(--task-color);}
+.sc-plain.f{color:var(--followup-color);}
+.sc-plain.p{color:var(--project-color);}
+.sc-badge{font-family:'JetBrains Mono',monospace;font-size:11px;padding:3px 9px;border-radius:3px;font-weight:700;}
+.b-task{background:rgba(255,184,0,.15);color:var(--task-color);border:1px solid rgba(255,184,0,.3);}
+.b-followup{background:rgba(184,61,255,.15);color:var(--followup-color);border:1px solid rgba(184,61,255,.3);}
+.b-project{background:rgba(0,210,106,.15);color:var(--project-color);border:1px solid rgba(0,210,106,.3);}
+.sc-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.sc-stat{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;}
+.sc-stat .num{font-size:20px;font-family:'Rajdhani',sans-serif;font-weight:700;display:block;line-height:1;}
+.sc-stat .lbl{color:var(--ink-dim);}
+.sc-warn{color:var(--red);}
+.sc-ok{color:var(--green);}
+.sc-amber{color:var(--amber);}
+.sc-action{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim);margin-top:10px;text-align:right;}
+
+/* ── OVERDUE PANEL ── */
+.overdue-panel{background:rgba(225,6,0,.06);border:1px solid rgba(225,6,0,.3);border-radius:6px;padding:14px 18px;margin-bottom:16px;}
+.overdue-head{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;text-transform:uppercase;color:var(--red);letter-spacing:.03em;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.overdue-head::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red);}
+.overdue-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(225,6,0,.15);font-size:13px;}
+.overdue-row:last-child{border-bottom:none;}
+.overdue-title{font-weight:500;flex:1;color:var(--paper);}
+.overdue-meta{font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--red);letter-spacing:.06em;text-transform:uppercase;margin-left:12px;}
+
+/* ── TABLE VIEW ── */
+.toolbar{display:flex;gap:10px;margin-bottom:16px;align-items:center;}
+.search-box{flex:1;min-width:180px;padding:8px 14px;border:1px solid var(--rule);background:var(--carbon-2);border-radius:4px;font-family:'Inter',sans-serif;font-size:13px;color:var(--paper);}
+.search-box::placeholder{color:var(--ink-low);}
+.search-box:focus{outline:1px solid var(--red);border-color:var(--red);}
+.table-wrap{background:var(--carbon-2);border:1px solid var(--rule);border-radius:6px;overflow:hidden;}
+table{width:100%;border-collapse:collapse;}
+thead th{text-align:left;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-dim);padding:12px 14px;border-bottom:1px solid var(--rule);background:var(--carbon-3);font-weight:500;}
+tbody td{padding:12px 14px;border-bottom:1px solid var(--rule-soft);font-size:13px;vertical-align:top;color:var(--paper);}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr{cursor:pointer;transition:background .1s;}
+tbody tr:hover{background:var(--carbon-3);}
+td.tc{font-weight:500;max-width:300px;}
+td .sub-text{color:var(--ink-dim);font-size:11px;margin-top:2px;font-family:'JetBrains Mono',monospace;}
+.pos{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-dim);font-weight:500;}
+
+/* ── TAGS ── */
+.tag{padding:2px 7px;border-radius:2px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;}
+.tag-dept{background:var(--carbon-3);color:var(--paper-mute);border:1px solid var(--rule);}
+.tag-bucket{padding:2px 7px;border-radius:2px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;}
+.bk-red{background:var(--red);color:var(--paper);}
+.bk-lap{background:var(--amber);color:var(--carbon);}
+.bk-race{background:var(--green);color:var(--carbon);}
+.bk-season{background:var(--blue);color:var(--paper);}
+.tag-status{padding:2px 7px;border-radius:2px;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;font-weight:500;}
+.st-ns{background:rgba(125,130,140,.15);color:var(--paper-mute);border:1px solid var(--ink-low);}
+.st-ip{background:rgba(0,210,106,.12);color:var(--green);border:1px solid rgba(0,210,106,.3);}
+.st-fu{background:rgba(255,184,0,.12);color:var(--amber);border:1px solid rgba(255,184,0,.4);}
+.st-ov{background:rgba(225,6,0,.15);color:var(--red);border:1px solid rgba(225,6,0,.4);}
+.st-done{background:rgba(184,61,255,.12);color:var(--purple);border:1px solid rgba(184,61,255,.3);text-decoration:line-through;}
+.st-pend{background:rgba(255,184,0,.12);color:var(--amber);border:1px solid rgba(255,184,0,.3);}
+.due{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-dim);white-space:nowrap;letter-spacing:.05em;text-transform:uppercase;}
+.due.ov{color:var(--red);font-weight:600;}
+.due.today{color:var(--amber);font-weight:600;}
+
+/* ── BUTTONS ── */
+.btn{padding:8px 16px;border:1px solid var(--rule);background:var(--carbon-2);color:var(--paper);font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border-radius:4px;cursor:pointer;transition:all .12s;}
+.btn:hover{background:var(--carbon-3);border-color:var(--paper-mute);}
+.btn-primary{background:var(--red);color:var(--paper);border-color:var(--red);}
+.btn-primary:hover{background:#ff1a0d;border-color:#ff1a0d;}
+.btn-amber{background:var(--amber);color:var(--carbon);border-color:var(--amber);}
+.btn-amber:hover{background:#ffc933;border-color:#ffc933;}
+.btn-ghost{background:transparent;border-color:var(--rule);color:var(--paper-mute);}
+.btn-ghost:hover{background:var(--carbon-3);color:var(--paper);}
+.btn-sm{padding:5px 11px;font-size:11px;}
+.btn-danger{background:transparent;color:var(--red);border-color:transparent;}
+.btn-danger:hover{background:var(--red);color:var(--paper);border-color:var(--red);}
+
+/* ── MODAL ── */
+.modal-bd{position:fixed;inset:0;background:rgba(0,0,0,.78);display:none;align-items:flex-start;justify-content:center;padding:50px 20px 20px;z-index:100;overflow-y:auto;backdrop-filter:blur(4px);}
+.modal-bd.open{display:flex;}
+.modal{background:var(--carbon-2);border-radius:6px;width:100%;max-width:740px;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.6);border:1px solid var(--rule);position:relative;overflow:hidden;}
+.modal::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.modal.mt::before{background:var(--task-color);}
+.modal.mf::before{background:var(--followup-color);}
+.modal.mp::before{background:var(--project-color);}
+.modal.sm{max-width:480px;}
+.modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--rule);}
+.modal-title-grp{flex:1;}
+.modal-type-badge{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;padding:2px 8px;border-radius:2px;display:inline-block;margin-bottom:6px;}
+.mtb-task{background:rgba(255,184,0,.15);color:var(--task-color);}
+.mtb-followup{background:rgba(184,61,255,.15);color:var(--followup-color);}
+.mtb-project{background:rgba(0,210,106,.15);color:var(--project-color);}
+.modal h2{font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;letter-spacing:.01em;line-height:1.15;color:var(--paper);text-transform:uppercase;}
+.modal h2 input{width:100%;border:none;background:transparent;font:inherit;color:inherit;padding:2px 0;text-transform:none;}
+.modal h2 input:focus{outline:none;border-bottom:1px dashed var(--red);}
+.x-btn{background:none;border:none;font-size:20px;cursor:pointer;color:var(--ink-dim);padding:4px 8px;line-height:1;}
+.x-btn:hover{color:var(--red);}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;}
+.ff{display:flex;flex-direction:column;gap:4px;}
+.ff.full{grid-column:1/-1;}
+.ff.third{grid-column:span 1;}
+.fl{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);}
+.ff input,.ff select,.ff textarea{padding:8px 11px;border:1px solid var(--rule);background:var(--carbon-3);border-radius:4px;font-family:'Inter',sans-serif;font-size:13px;color:var(--paper);}
+.ff textarea{resize:vertical;min-height:56px;}
+.ff input:focus,.ff select:focus,.ff textarea:focus{outline:1px solid var(--red);border-color:var(--red);}
+
+/* ── FOLLOW-UP LOG (inside modal) ── */
+.log-section{margin-top:20px;padding-top:18px;border-top:1px solid var(--rule);}
+.log-head{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-dim);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.log-head::before{content:'●';color:var(--amber);font-size:10px;}
+.log-entry{padding:9px 13px;background:var(--carbon-3);border-left:3px solid var(--rule);margin-bottom:7px;border-radius:0 4px 4px 0;font-size:13px;}
+.log-entry.from-ceo{border-left-color:var(--red);background:rgba(225,6,0,.05);}
+.log-entry.from-fo{border-left-color:var(--green);}
+.log-meta{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ink-dim);letter-spacing:.07em;text-transform:uppercase;margin-bottom:3px;}
+.log-meta .auth{color:var(--paper-mute);font-weight:500;}
+.log-entry.from-ceo .auth{color:var(--red);}
+.log-entry.from-fo .auth{color:var(--green);}
+.log-add{display:flex;gap:8px;margin-top:10px;}
+.log-add textarea{flex:1;padding:8px 11px;border:1px solid var(--rule);background:var(--carbon-3);color:var(--paper);border-radius:4px;font-family:'Inter',sans-serif;font-size:13px;resize:vertical;min-height:36px;}
+.log-author-sel{padding:8px 10px;border:1px solid var(--rule);background:var(--carbon-3);color:var(--paper);border-radius:4px;font-size:11px;}
+
+.modal-actions{display:flex;justify-content:space-between;gap:10px;margin-top:20px;padding-top:14px;border-top:1px solid var(--rule);}
+.modal-actions-r{display:flex;gap:8px;}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:36px 20px;color:var(--ink-dim);}
+.empty .big{font-family:'Rajdhani',sans-serif;font-size:16px;color:var(--paper-mute);margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;}
+.empty .sm{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-low);}
+
+/* ── GLOSSARY ── */
+.glo-btn{position:fixed;bottom:22px;right:22px;background:var(--red);color:var(--paper);border:none;padding:9px 15px;border-radius:4px;font-family:'Rajdhani',sans-serif;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.4);z-index:50;}
+.glo-btn:hover{background:#ff1a0d;}
+.glo-panel{position:fixed;bottom:62px;right:22px;width:320px;max-height:55vh;overflow-y:auto;background:var(--carbon-2);border:1px solid var(--rule);border-radius:6px;padding:16px;box-shadow:0 16px 50px rgba(0,0,0,.5);z-index:50;display:none;}
+.glo-panel::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--red);}
+.glo-panel.open{display:block;}
+.glo-title{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;text-transform:uppercase;margin-bottom:3px;}
+.glo-sub{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;}
+.glo-row{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--rule-soft);font-size:11.5px;}
+.glo-row:last-child{border-bottom:none;}
+.glo-term{font-family:'Rajdhani',sans-serif;font-weight:600;color:var(--red);text-transform:uppercase;letter-spacing:.03em;flex-shrink:0;}
+.glo-meaning{color:var(--paper-mute);text-align:right;}
+
+/* ── SETTINGS ── */
+.set-section{margin-bottom:16px;}
+.set-section-title{font-family:'Rajdhani',sans-serif;font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--paper);margin-bottom:6px;}
+.set-help{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-dim);line-height:1.5;margin-bottom:8px;}
+.url-inp{width:100%;padding:9px 11px;border:1px solid var(--rule);background:var(--carbon-3);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--paper);}
+
+/* ── DEPT MANAGER ── */
+.dept-row{display:flex;justify-content:space-between;align-items:center;padding:9px 13px;border-bottom:1px solid var(--rule-soft);font-size:13px;color:var(--paper);}
+.dept-row:last-child{border-bottom:none;}
+.dept-row .core-badge{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--red);letter-spacing:.1em;text-transform:uppercase;background:rgba(225,6,0,.1);border:1px solid rgba(225,6,0,.3);padding:2px 6px;border-radius:2px;}
+.dept-row-actions{display:flex;gap:6px;}
+.dept-list{border:1px solid var(--rule);border-radius:4px;background:var(--carbon-3);max-height:360px;overflow-y:auto;}
+
+@media(max-width:900px){
+  .app{grid-template-columns:1fr;}
+  aside{position:static;height:auto;}
+  .summary-grid,.stats{grid-template-columns:1fr 1fr;}
+  main{padding:20px;}
+}
+</style>
+</head>
+<body>
+<div class="race-stripe"></div>
+<div class="app">
+  <aside>
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div class="brand-name">Race <span>Control</span></div>
+    </div>
+    <div class="brand-sub">NRPL · Founder's Office</div>
+
+    <div class="nav-section">
+      <div class="nav-section-header"><div class="nav-section-bar bar-cmd"></div><div class="nav-section-label">Command</div></div>
+      <div class="nav-item type-cmd active" data-view="pitwall">
+        <div class="nav-item-inner"><div class="nav-f1">Pit Wall</div><div class="nav-plain">CEO Dashboard</div></div>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-header"><div class="nav-section-bar bar-task"></div><div class="nav-section-label">The Grid · <em>Tasks</em></div></div>
+      <div class="nav-item type-task" data-view="tasks">
+        <div class="nav-item-inner"><div class="nav-f1">All Tasks</div><div class="nav-plain">Full Grid</div></div>
+        <span class="nav-count" id="cnt-tasks">0</span>
+      </div>
+      <div class="nav-item type-task" data-view="tasks-overdue">
+        <div class="nav-item-inner"><div class="nav-f1">⚠ Overdue</div><div class="nav-plain">Follow-up due</div></div>
+        <span class="nav-count" id="cnt-overdue">0</span>
+      </div>
+      <div class="nav-item type-task" data-view="tasks-done">
+        <div class="nav-item-inner"><div class="nav-f1">Completed</div><div class="nav-plain">Closed tasks</div></div>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-header"><div class="nav-section-bar bar-followup"></div><div class="nav-section-label">Pit Stops · <em>Follow-ups</em></div></div>
+      <div class="nav-item type-followup" data-view="followups">
+        <div class="nav-item-inner"><div class="nav-f1">All Pit Stops</div><div class="nav-plain">All follow-ups</div></div>
+        <span class="nav-count" id="cnt-followups">0</span>
+      </div>
+      <div class="nav-item type-followup" data-view="followups-pending">
+        <div class="nav-item-inner"><div class="nav-f1">Due Today</div><div class="nav-plain">Needs action</div></div>
+        <span class="nav-count" id="cnt-fu-today">0</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-header"><div class="nav-section-bar bar-project"></div><div class="nav-section-label">The Season · <em>Projects</em></div></div>
+      <div class="nav-item type-project" data-view="projects">
+        <div class="nav-item-inner"><div class="nav-f1">All Projects</div><div class="nav-plain">Full Season</div></div>
+        <span class="nav-count" id="cnt-projects">0</span>
+      </div>
+      <div class="nav-item type-project" data-view="projects-ceo">
+        <div class="nav-item-inner"><div class="nav-f1">On CEO</div><div class="nav-plain">Waiting on Principal</div></div>
+        <span class="nav-count" id="cnt-ceo">0</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-header">
+        <div class="nav-section-bar bar-task"></div>
+        <div class="nav-section-label">Departments</div>
+        <button class="nav-add-btn" onclick="openAddDept()" title="Add dept">+</button>
+      </div>
+      <div id="nav-depts"></div>
+      <div class="nav-item" onclick="openManageDepts()" style="margin-top:4px;">
+        <div class="nav-item-inner"><div class="nav-f1" style="font-size:11px;color:var(--ink-dim);">Manage Depts…</div></div>
+      </div>
+    </div>
+  </aside>
+
+  <div style="display:flex;flex-direction:column;min-height:100vh;">
+    <div class="topbar">
+      <div class="telem">
+        <span class="telem-dot live" id="sync-dot"></span>
+        <span id="sync-status">CONNECTING…</span>
+        <span>·</span>
+        <span id="telem-date">—</span>
+      </div>
+      <div class="topbar-actions">
+        <div class="role-sw">
+          <button class="role-btn active" data-role="fo">FO (Amit)</button>
+          <button class="role-btn" data-role="ceo">Principal</button>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="openSettings()">⚙</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportData()">Export</button>
+        <button class="btn btn-amber btn-sm" onclick="openNewTask()">+ Task</button>
+        <button class="btn btn-ghost btn-sm" onclick="openNewFollowup()" style="border-color:rgba(184,61,255,.4);color:var(--followup-color);">+ Follow-up</button>
+        <button class="btn btn-ghost btn-sm" onclick="openNewProject()" style="border-color:rgba(0,210,106,.4);color:var(--project-color);">+ Project</button>
+      </div>
+    </div>
+    <main id="main"></main>
+  </div>
+</div>
+
+<!-- F1 Glossary -->
+<button class="glo-btn" onclick="toggleGlossary()">F1 Key</button>
+<div class="glo-panel" id="glo-panel">
+  <div class="glo-title">F1 → Plain English</div>
+  <div class="glo-sub">What everything means</div>
+  <div class="glo-row"><span class="glo-term">Pit Wall</span><span class="glo-meaning">CEO Dashboard</span></div>
+  <div class="glo-row"><span class="glo-term">The Grid</span><span class="glo-meaning">Tasks · dept-dependent</span></div>
+  <div class="glo-row"><span class="glo-term">Pit Stops</span><span class="glo-meaning">Follow-up Tasks · nudges</span></div>
+  <div class="glo-row"><span class="glo-term">The Season</span><span class="glo-meaning">Projects · you + founder</span></div>
+  <div class="glo-row"><span class="glo-term">Red Flag</span><span class="glo-meaning">Urgent · 1-2 days</span></div>
+  <div class="glo-row"><span class="glo-term">Current Lap</span><span class="glo-meaning">Sprint · 1 week-1 month</span></div>
+  <div class="glo-row"><span class="glo-term">This Race</span><span class="glo-meaning">Quarterly</span></div>
+  <div class="glo-row"><span class="glo-term">The Season</span><span class="glo-meaning">Strategic · 6 months+</span></div>
+  <div class="glo-row"><span class="glo-term">Principal</span><span class="glo-meaning">Team Principal · CEO</span></div>
+  <div class="glo-row"><span class="glo-term">Follow-up Log</span><span class="glo-meaning">Timestamped nudge history</span></div>
+  <div class="glo-row"><span class="glo-term">Team Radio</span><span class="glo-meaning">Remarks between you + CEO</span></div>
+</div>
+
+<!-- TASK MODAL -->
+<div class="modal-bd" id="modal-task">
+<div class="modal mt">
+  <div class="modal-head">
+    <div class="modal-title-grp">
+      <span class="modal-type-badge mtb-task">🏎 The Grid · Task</span>
+      <h2><input id="t-title" placeholder="Task title…"/></h2>
+    </div>
+    <button class="x-btn" onclick="closeModal('modal-task')">×</button>
+  </div>
+  <div class="fg">
+    <div class="ff"><label class="fl">Department</label><select id="t-dept"></select></div>
+    <div class="ff"><label class="fl">Person Name</label><input type="text" id="t-person" placeholder="Specific individual"/></div>
+    <div class="ff"><label class="fl">Priority</label>
+      <select id="t-bucket">
+        <option value="Red Flag">🔴 Red Flag — Urgent (1-2d)</option>
+        <option value="Current Lap">🟡 Current Lap — Sprint (1w-1m)</option>
+        <option value="This Race">🏁 This Race — Quarterly</option>
+        <option value="The Season">🏆 The Season — Strategic</option>
+      </select>
+    </div>
+    <div class="ff"><label class="fl">Status</label>
+      <select id="t-status">
+        <option value="Not Started">Not Started</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Follow-up Due">Follow-up Due</option>
+        <option value="Overdue">Overdue</option>
+        <option value="Done">Done ✓</option>
+      </select>
+    </div>
+    <div class="ff"><label class="fl">Start Date</label><input type="date" id="t-start"/></div>
+    <div class="ff"><label class="fl">Follow-up Date</label><input type="date" id="t-followup"/></div>
+    <div class="ff full"><label class="fl">Completion Date</label><input type="date" id="t-completion"/></div>
+    <div class="ff full"><label class="fl">Description / Context</label><textarea id="t-desc" placeholder="What's required, background…"></textarea></div>
+  </div>
+  <div class="log-section">
+    <div class="log-head">Follow-up Log · Nudge History</div>
+    <div id="t-log"></div>
+    <div class="log-add">
+      <select class="log-author-sel" id="t-log-author"><option value="FO">FO</option><option value="CEO">CEO</option></select>
+      <textarea id="t-log-text" placeholder="Log a follow-up note, response received, next step…"></textarea>
+      <button class="btn btn-amber" onclick="addLog('task')">Log</button>
+    </div>
+  </div>
+  <div class="modal-actions">
+    <button class="btn btn-danger" id="t-delete" onclick="deleteCurrentItem('modal-task')">Remove</button>
+    <div class="modal-actions-r">
+      <button class="btn" onclick="closeModal('modal-task')">Cancel</button>
+      <button class="btn btn-amber" onclick="saveTask()">Save Task</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- FOLLOW-UP MODAL -->
+<div class="modal-bd" id="modal-followup">
+<div class="modal mf">
+  <div class="modal-head">
+    <div class="modal-title-grp">
+      <span class="modal-type-badge mtb-followup">🔧 Pit Stop · Follow-up</span>
+      <h2><input id="f-title" placeholder="What are you following up on?"/></h2>
+    </div>
+    <button class="x-btn" onclick="closeModal('modal-followup')">×</button>
+  </div>
+  <div class="fg">
+    <div class="ff"><label class="fl">Department</label><select id="f-dept"></select></div>
+    <div class="ff"><label class="fl">Person Name</label><input type="text" id="f-person" placeholder="Who to chase"/></div>
+    <div class="ff"><label class="fl">Status</label>
+      <select id="f-status">
+        <option value="Pending">Pending</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Done">Done ✓</option>
+      </select>
+    </div>
+    <div class="ff"><label class="fl">Linked Task (optional)</label><select id="f-linked"></select></div>
+    <div class="ff"><label class="fl">Start Date</label><input type="date" id="f-start"/></div>
+    <div class="ff"><label class="fl">Follow-up Date</label><input type="date" id="f-followup"/></div>
+    <div class="ff full"><label class="fl">Closure Date</label><input type="date" id="f-closure"/></div>
+    <div class="ff full"><label class="fl">Description / What you're chasing</label><textarea id="f-desc" placeholder="Context, what's needed, last status…"></textarea></div>
+  </div>
+  <div class="log-section">
+    <div class="log-head">Follow-up Log · Nudge History</div>
+    <div id="f-log"></div>
+    <div class="log-add">
+      <select class="log-author-sel" id="f-log-author"><option value="FO">FO</option><option value="CEO">CEO</option></select>
+      <textarea id="f-log-text" placeholder="Log what happened, response received…"></textarea>
+      <button class="btn" style="background:var(--followup-color);color:var(--paper);border-color:var(--followup-color);" onclick="addLog('followup')">Log</button>
+    </div>
+  </div>
+  <div class="modal-actions">
+    <button class="btn btn-danger" id="f-delete" onclick="deleteCurrentItem('modal-followup')">Remove</button>
+    <div class="modal-actions-r">
+      <button class="btn" onclick="closeModal('modal-followup')">Cancel</button>
+      <button class="btn" style="background:var(--followup-color);color:var(--paper);border-color:var(--followup-color);" onclick="saveFollowup()">Save Follow-up</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- PROJECT MODAL -->
+<div class="modal-bd" id="modal-project">
+<div class="modal mp">
+  <div class="modal-head">
+    <div class="modal-title-grp">
+      <span class="modal-type-badge mtb-project">🏆 The Season · Project</span>
+      <h2><input id="p-title" placeholder="Project title…"/></h2>
+    </div>
+    <button class="x-btn" onclick="closeModal('modal-project')">×</button>
+  </div>
+  <div class="fg">
+    <div class="ff"><label class="fl">Race Window</label>
+      <select id="p-bucket">
+        <option value="Red Flag">🔴 Red Flag — Urgent</option>
+        <option value="Current Lap">🟡 Current Lap — Sprint</option>
+        <option value="This Race">🏁 This Race — Quarterly</option>
+        <option value="The Season">🏆 The Season — Strategic</option>
+      </select>
+    </div>
+    <div class="ff"><label class="fl">Owner</label>
+      <select id="p-owner">
+        <option value="Amit (FO)">Amit (FO)</option>
+        <option value="CEO">CEO</option>
+        <option value="Both">Both</option>
+      </select>
+    </div>
+    <div class="ff"><label class="fl">Status</label>
+      <select id="p-status">
+        <option value="On the Grid">On the Grid (Not Started)</option>
+        <option value="On Track">On Track (In Progress)</option>
+        <option value="Box Box">Box Box (Waiting on CEO)</option>
+        <option value="Done">Chequered Flag (Done)</option>
+      </select>
+    </div>
+    <div class="ff"><label class="fl">Start Date</label><input type="date" id="p-start"/></div>
+    <div class="ff"><label class="fl">Due Date</label><input type="date" id="p-due"/></div>
+    <div class="ff"><label class="fl">Next Review</label><input type="date" id="p-review"/></div>
+    <div class="ff full"><label class="fl">Description / Scope</label><textarea id="p-desc" placeholder="What this project is, desired outcome…"></textarea></div>
+    <div class="ff"><label class="fl">Dependency</label><input type="text" id="p-dep" placeholder="What's constraining progress"/></div>
+    <div class="ff"><label class="fl">Pendency</label><input type="text" id="p-pend" placeholder="What's currently stuck"/></div>
+  </div>
+  <div class="log-section">
+    <div class="log-head" style="--c:var(--green);">Team Radio · Remarks</div>
+    <div id="p-log"></div>
+    <div class="log-add">
+      <select class="log-author-sel" id="p-log-author"><option value="FO">FO</option><option value="CEO">CEO</option></select>
+      <textarea id="p-log-text" placeholder="Status update, decision, next step…"></textarea>
+      <button class="btn btn-primary" onclick="addLog('project')" style="background:var(--project-color);border-color:var(--project-color);color:var(--carbon);">Send</button>
+    </div>
+  </div>
+  <div class="modal-actions">
+    <button class="btn btn-danger" id="p-delete" onclick="deleteCurrentItem('modal-project')">Remove</button>
+    <div class="modal-actions-r">
+      <button class="btn" onclick="closeModal('modal-project')">Cancel</button>
+      <button class="btn" style="background:var(--project-color);color:var(--carbon);border-color:var(--project-color);" onclick="saveProject()">Save Project</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ADD DEPT MODAL -->
+<div class="modal-bd" id="modal-adddept">
+<div class="modal sm">
+  <div class="modal-head">
+    <div class="modal-title-grp"><h2>Add Department</h2></div>
+    <button class="x-btn" onclick="closeModal('modal-adddept')">×</button>
+  </div>
+  <div class="ff" style="margin-bottom:16px;">
+    <label class="fl">Department Name</label>
+    <input type="text" id="adddept-name" placeholder="e.g. Operations, HR, Tech"/>
+  </div>
+  <div class="modal-actions">
+    <div></div>
+    <div class="modal-actions-r">
+      <button class="btn" onclick="closeModal('modal-adddept')">Cancel</button>
+      <button class="btn btn-amber" onclick="saveNewDept()">Add</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- MANAGE DEPTS MODAL -->
+<div class="modal-bd" id="modal-managedepts">
+<div class="modal sm">
+  <div class="modal-head">
+    <div class="modal-title-grp">
+      <h2>Manage Departments</h2>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--ink-dim);letter-spacing:.1em;text-transform:uppercase;margin-top:4px;">Rename or remove custom departments</div>
+    </div>
+    <button class="x-btn" onclick="closeModal('modal-managedepts')">×</button>
+  </div>
+  <div class="dept-list" id="dept-list"></div>
+  <div class="modal-actions"><div></div><div class="modal-actions-r"><button class="btn btn-amber" onclick="closeModal('modal-managedepts')">Done</button></div></div>
+</div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-bd" id="modal-settings">
+<div class="modal sm">
+  <div class="modal-head">
+    <div class="modal-title-grp"><h2>⚙ Settings</h2></div>
+    <button class="x-btn" onclick="closeModal('modal-settings')">×</button>
+  </div>
+  <div class="set-section">
+    <div class="set-section-title">Google Sheets Endpoint</div>
+    <div class="set-help">Paste your Apps Script Web App URL (ends in /exec). Same URL for both you and the CEO.</div>
+    <input type="text" id="set-url" class="url-inp" placeholder="https://script.google.com/macros/s/…/exec"/>
+  </div>
+  <div class="set-section">
+    <div class="set-section-title">Sync Interval</div>
+    <select id="set-interval" class="url-inp">
+      <option value="5">5 seconds</option>
+      <option value="10" selected>10 seconds (recommended)</option>
+      <option value="30">30 seconds</option>
+      <option value="0">Manual only</option>
+    </select>
+  </div>
+  <div class="set-section">
+    <div class="set-section-title">Import Data</div>
+    <div class="set-help">Restore from a JSON export. Replaces Sheet contents.</div>
+    <button class="btn" onclick="importData()">Import JSON…</button>
+  </div>
+  <div class="modal-actions">
+    <div></div>
+    <div class="modal-actions-r">
+      <button class="btn" onclick="closeModal('modal-settings')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save & Reconnect</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+// ============================================================
+//  STATE
+// ============================================================
+const STORAGE_KEY='rc-v5';
+const SETTINGS_KEY='rc-v5-settings';
+const CORE_DEPTS=['Finance & Accounts','Logistics','Warehouse','Pricing','Modern Trade','EBO','Audit','Customer Success','P&L','SOPs','OKRs'];
+
+let S={
+  items:[],customDepts:[],
+  role:'fo',view:'pitwall',filter:null,editingId:null,
+  syncStatus:'connecting',lastSync:null,pendingChanges:[],
+  settings:{sheetsUrl:'',syncInterval:10},
+};
+
+const tasks=()=>S.items.filter(i=>i.type==='task');
+const followups=()=>S.items.filter(i=>i.type==='followup');
+const projects=()=>S.items.filter(i=>i.type==='project');
+const allDepts=()=>[...CORE_DEPTS,...S.customDepts];
+const active=(arr)=>arr.filter(i=>i.status!=='Done');
+
+// ============================================================
+//  PERSISTENCE
+// ============================================================
+function loadSettings(){try{const r=localStorage.getItem(SETTINGS_KEY);if(r)S.settings={...S.settings,...JSON.parse(r)};}catch(e){}}
+function saveSettings2Storage(){try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(S.settings));}catch(e){}}
+function loadLocalCache(){
+  try{
+    const r=localStorage.getItem(STORAGE_KEY);
+    if(r){const p=JSON.parse(r);if(p.items)S.items=p.items;if(p.customDepts)S.customDepts=p.customDepts;if(p.pendingChanges)S.pendingChanges=p.pendingChanges;return true;}
+  }catch(e){}
+  return false;
+}
+function persistCache(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify({items:S.items,customDepts:S.customDepts,pendingChanges:S.pendingChanges}));}catch(e){}}
+
+// ============================================================
+//  GOOGLE SHEETS SYNC
+// ============================================================
+async function fetchSheets(){
+  if(!S.settings.sheetsUrl)return null;
+  try{
+    const r=await fetch(S.settings.sheetsUrl,{method:'GET',redirect:'follow'});
+    const d=await r.json();
+    if(!d.ok)throw new Error(d.error);
+    return d;
+  }catch(e){setSyncStatus('error','OFFLINE · Local cache');return null;}
+}
+async function postSheets(action,payload){
+  if(!S.settings.sheetsUrl){queueChange({action,payload});setSyncStatus('offline','NOT CONFIGURED');return null;}
+  try{
+    setSyncStatus('syncing','SYNCING…');
+    const r=await fetch(S.settings.sheetsUrl,{method:'POST',mode:'cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action,...payload}),redirect:'follow'});
+    const d=await r.json();
+    if(!d.ok)throw new Error(d.error);
+    if(d.items){S.items=d.items;S.customDepts=d.customDepts||[];persistCache();}
+    setSyncStatus('live',`LIVE · just now`);S.lastSync=Date.now();
+    return d;
+  }catch(e){queueChange({action,payload});setSyncStatus('error','OFFLINE · Queued');return null;}
+}
+function queueChange(c){S.pendingChanges.push({...c,ts:Date.now()});persistCache();}
+async function flushPending(){
+  if(!S.pendingChanges.length||!S.settings.sheetsUrl)return;
+  const q=[...S.pendingChanges];S.pendingChanges=[];
+  for(const c of q){try{await postSheets(c.action,c.payload);}catch(e){S.pendingChanges.push(c);}}
+  persistCache();
+}
+async function syncTick(){
+  if(!S.settings.sheetsUrl)return;
+  if(document.querySelector('.modal-bd.open'))return;
+  if(S.pendingChanges.length)await flushPending();
+  setSyncStatus('syncing','CHECKING…');
+  const d=await fetchSheets();
+  if(d){
+    const changed=d.items.length!==S.items.length||d.items.some(ni=>{const li=S.items.find(i=>i.id===ni.id);return!li||(li.updatedAt||0)<(ni.updatedAt||0);});
+    S.items=d.items;S.customDepts=d.customDepts||[];persistCache();
+    setSyncStatus('live',`LIVE · just now`);S.lastSync=Date.now();
+    if(changed)render();
+  }
+}
+function setSyncStatus(s,txt){
+  S.syncStatus=s;
+  const dot=document.getElementById('sync-dot');
+  const lbl=document.getElementById('sync-status');
+  if(!dot||!lbl)return;
+  dot.className='telem-dot';
+  if(s==='live')dot.classList.add('live');
+  else if(s==='syncing')dot.classList.add('syncing');
+  else if(s==='error'||s==='offline')dot.classList.add(s==='error'?'error':'offline');
+  lbl.textContent=txt||s.toUpperCase();
+}
+let syncTimer=null;
+function startSyncTimer(){
+  if(syncTimer)clearInterval(syncTimer);
+  const sec=parseInt(S.settings.syncInterval)||10;
+  if(sec>0)syncTimer=setInterval(syncTick,sec*1000);
+}
+async function upsertItem(item,skipRender){
+  item.updatedAt=Date.now();
+  const idx=S.items.findIndex(i=>i.id===item.id);
+  if(idx>=0)S.items[idx]=item;else S.items.push(item);
+  persistCache();
+  if(!skipRender)render();
+  postSheets('upsert',{item});
+}
+async function removeItem(id){S.items=S.items.filter(i=>i.id!==id);persistCache();render();postSheets('delete',{id});}
+async function pushCustomDepts(){postSheets('set_custom_depts',{customDepts:S.customDepts});}
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
+
+// ============================================================
+//  QUICK CAPTURE
+// ============================================================
+function parseQC(text){
+  const result={title:text,type:'task'};const tags=[];
+  // Type: /task /followup /fu /project /proj
+  text.replace(/\/(\w+)/g,(m,t)=>{
+    const l=t.toLowerCase();
+    if(['followup','fu','pitstop'].includes(l))result.type='followup';
+    else if(['project','proj','season'].includes(l))result.type='project';
+    else if(l==='task')result.type='task';
+    tags.push(m);return m;
+  });
+  // Bucket / priority
+  const bmap={'urgent':'Red Flag','red':'Red Flag','sprint':'Current Lap','lap':'Current Lap','quarterly':'This Race','race':'This Race','strategic':'The Season','season':'The Season'};
+  text.replace(/#(\w+)/g,(m,tag)=>{
+    const l=tag.toLowerCase();
+    if(bmap[l])result.bucket=bmap[l];
+    tags.push(m);return m;
+  });
+  // Person @Name
+  text.replace(/@(\w+)/g,(m,p)=>{
+    const l=p.toLowerCase();
+    if(['ceo','principal'].includes(l)){result.owner='CEO';result.person_name='CEO';}
+    else if(['amit','fo'].includes(l)){result.owner='Amit (FO)';}
+    else result.person_name=p;
+    tags.push(m);return m;
+  });
+  // Due date
+  text.replace(/due:(\S+)/gi,(m,d)=>{
+    const today=new Date();today.setHours(0,0,0,0);let dt=null;
+    if(d==='today')dt=today;
+    else if(['tomorrow','tmr'].includes(d)){dt=new Date(today);dt.setDate(dt.getDate()+1);}
+    else if(/^(\d+)d$/i.test(d)){dt=new Date(today);dt.setDate(dt.getDate()+parseInt(RegExp.$1));}
+    else if(/^\d{4}-\d{2}-\d{2}$/.test(d))dt=new Date(d);
+    if(dt)result.followup_date=result.due_date=dt.toISOString().split('T')[0];
+    tags.push(m);return m;
+  });
+  result.title=tags.reduce((t,tag)=>t.replace(tag,''),text).replace(/\s+/g,' ').trim()||'(untitled)';
+  return result;
+}
+async function submitQC(){
+  const inp=document.getElementById('qc-input');if(!inp)return;
+  const text=inp.value.trim();if(!text)return;
+  inp.value='';
+  const parsed=parseQC(text);
+  const now=Date.now();
+  const item={id:uid(),type:parsed.type,title:parsed.title,department:'',person_name:parsed.person_name||'',bucket:parsed.bucket||'Current Lap',owner:parsed.owner||'Amit (FO)',status:'Not Started',start_date:new Date().toISOString().split('T')[0],followup_date:parsed.followup_date||'',completion_date:'',due_date:parsed.due_date||'',description:'',dependency:'',pendency:'',linked_task_id:'',followup_log:[],remarks_json:[],createdAt:now,updatedAt:now,inbox:true};
+  await upsertItem(item);
+  const fb=document.getElementById('qc-fb');
+  if(fb){const map={task:'ADDED TO GRID',followup:'ADDED TO PIT STOPS',project:'ADDED TO SEASON'};fb.textContent='✓ '+map[item.type];fb.classList.add('show');setTimeout(()=>fb.classList.remove('show'),2000);}
+}
+
+// ============================================================
+//  RENDER ENGINE
+// ============================================================
+function render(){
+  renderNavDepts();renderNavCounts();updateTelemetry();
+  const m=document.getElementById('main');
+  const views={
+    'pitwall':renderPitWall,
+    'tasks':()=>renderTaskTable(tasks(),'tasks'),
+    'tasks-overdue':()=>renderTaskTable(tasks().filter(i=>isOverdueTask(i)||i.status==='Follow-up Due'),'tasks-overdue'),
+    'tasks-done':()=>renderTaskTable(tasks().filter(i=>i.status==='Done'),'tasks-done'),
+    'followups':()=>renderFollowupTable(followups()),
+    'followups-pending':()=>renderFollowupTable(followups().filter(i=>i.status!=='Done'&&i.followup_date&&new Date(i.followup_date)<=new Date())),
+    'projects':()=>renderProjectTable(projects()),
+    'projects-ceo':()=>renderProjectTable(projects().filter(i=>i.owner==='CEO'&&i.status!=='Done')),
+    'dept':()=>renderTaskTable(tasks().filter(i=>i.department===S.filter),'dept'),
+  };
+  m.innerHTML=(views[S.view]||renderPitWall)();
+  attachClicks();attachNavClicks();attachQC();
+  // repopulate dept selects
+  repopulateDeptSelects();
+}
+
+function renderNavDepts(){
+  const c=document.getElementById('nav-depts');if(!c)return;
+  c.innerHTML=allDepts().map(d=>{
+    const cnt=tasks().filter(i=>i.department===d&&i.status!=='Done').length;
+    const active=S.view==='dept'&&S.filter===d?'active type-task':'';
+    return `<div class="nav-item ${active}" data-view="dept" data-filter="${esc(d)}">
+      <div class="nav-item-inner"><div class="nav-f1" style="font-size:12.5px;">${esc(d)}</div></div>
+      ${cnt>0?`<span class="nav-count">${cnt}</span>`:''}
+    </div>`;
+  }).join('');
+}
+
+function renderNavCounts(){
+  const t=tasks(),f=followups(),p=projects();
+  const today=startOfToday();
+  set('cnt-tasks',active(t).length);
+  set('cnt-overdue',t.filter(i=>isOverdueTask(i)||i.status==='Follow-up Due').length);
+  set('cnt-followups',active(f).length);
+  set('cnt-fu-today',f.filter(i=>i.status!=='Done'&&i.followup_date&&new Date(i.followup_date)<=today).length);
+  set('cnt-projects',active(p).length);
+  set('cnt-ceo',p.filter(i=>i.owner==='CEO'&&i.status!=='Done').length);
+}
+function set(id,v){const el=document.getElementById(id);if(el)el.textContent=v;}
+
+function updateTelemetry(){
+  const d=document.getElementById('telem-date');
+  if(d)d.textContent=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}).toUpperCase();
+}
+
+function isOverdueTask(i){
+  if(i.status==='Done')return false;
+  if(!i.followup_date)return false;
+  return new Date(i.followup_date)<startOfToday();
+}
+
+// ── PIT WALL ──────────────────────────────────────────────
+function renderPitWall(){
+  const t=tasks(),f=followups(),p=projects();
+  const tActive=active(t),fActive=active(f),pActive=active(p);
+  const tOverdue=t.filter(isOverdueTask).length;
+  const fToday=f.filter(i=>i.status!=='Done'&&i.followup_date&&new Date(i.followup_date)<=startOfToday()).length;
+  const pCEO=p.filter(i=>i.owner==='CEO'&&i.status!=='Done').length;
+  const overdueItems=[...t.filter(isOverdueTask),...f.filter(i=>i.status!=='Done'&&i.followup_date&&new Date(i.followup_date)<startOfToday())].sort((a,b)=>(a.followup_date||'').localeCompare(b.followup_date||''));
+  const name=S.role==='ceo'?'Principal':'Amit';
+
+  return `
+    <div class="qc-bar">
+      <span class="qc-label">⚡ Quick Capture</span>
+      <input id="qc-input" class="qc-input" placeholder="Type anything… e.g. Rohit audit file #urgent /finance due:tomorrow  |  /followup @CEO  |  /project OKR Q1" autocomplete="off"/>
+      <span class="qc-fb" id="qc-fb"></span>
+      <span class="qc-hint">↵ ENTER · Ctrl+K</span>
+    </div>
+
+    <div class="page-head head-cmd">
+      <div>
+        <h1>Pit <span class="accent-red">Wall</span></h1>
+        <div class="page-sub">Good ${greeting()}, ${name} · NRPL Command Centre</div>
+      </div>
+      <div class="page-meta">
+        <div class="date">${longDate()}</div>
+        <div>${timeStr()} IST · ${S.items.length} total items</div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat s-amber">
+        <div class="stat-lbl">🏎 The Grid · Tasks</div>
+        <div class="stat-val sv-amber">${pad(tActive.length)}</div>
+        <div class="stat-sub">Active · ${tOverdue} overdue</div>
+      </div>
+      <div class="stat s-purple">
+        <div class="stat-lbl">🔧 Pit Stops · Follow-ups</div>
+        <div class="stat-val sv-purple">${pad(fActive.length)}</div>
+        <div class="stat-sub">Pending · ${fToday} due today</div>
+      </div>
+      <div class="stat s-green">
+        <div class="stat-lbl">🏆 The Season · Projects</div>
+        <div class="stat-val sv-green">${pad(pActive.length)}</div>
+        <div class="stat-sub">In flight · ${pCEO} on CEO</div>
+      </div>
+      <div class="stat s-red">
+        <div class="stat-lbl">⚠ Needs Attention</div>
+        <div class="stat-val ${(tOverdue+fToday)>0?'sv-red':''}">${pad(tOverdue+fToday)}</div>
+        <div class="stat-sub">Overdue + due today</div>
+      </div>
+    </div>
+
+    ${overdueItems.length>0?`
+    <div class="overdue-panel">
+      <div class="overdue-head">Needs Immediate Attention</div>
+      ${overdueItems.slice(0,8).map(i=>`
+        <div class="overdue-row" data-id="${i.id}" data-type="${i.type}" style="cursor:pointer;">
+          <span class="overdue-title">${esc(i.title)}</span>
+          <span class="overdue-meta">${i.type==='task'?'TASK':'FOLLOW-UP'} · ${esc(i.department||'')} · ${i.followup_date?renderDue(i.followup_date):''}</span>
+        </div>`).join('')}
+    </div>`:''}
+
+    <div class="summary-grid">
+      <div class="sum-card sc-task" onclick="navigateTo('tasks')">
+        <div class="sc-head">
+          <div><div class="sc-title">🏎 The Grid</div><div class="sc-plain t">Tasks · Dept-dependent</div></div>
+          <span class="sc-badge b-task">${tActive.length} active</span>
+        </div>
+        <div class="sc-stats">
+          <div class="sc-stat"><span class="num ${tOverdue>0?'sc-warn':''}">${tOverdue}</span><span class="lbl">Overdue</span></div>
+          <div class="sc-stat"><span class="num sc-amber">${t.filter(i=>i.status==='Follow-up Due').length}</span><span class="lbl">Follow-up Due</span></div>
+          <div class="sc-stat"><span class="num sc-ok">${t.filter(i=>i.status==='Done').length}</span><span class="lbl">Completed</span></div>
+          <div class="sc-stat"><span class="num">${tActive.filter(i=>i.status==='Not Started').length}</span><span class="lbl">Not Started</span></div>
+        </div>
+        <div class="sc-action">Click to view all tasks →</div>
+      </div>
+
+      <div class="sum-card sc-followup" onclick="navigateTo('followups')">
+        <div class="sc-head">
+          <div><div class="sc-title">🔧 Pit Stops</div><div class="sc-plain f">Follow-up Tasks · Nudges</div></div>
+          <span class="sc-badge b-followup">${fActive.length} pending</span>
+        </div>
+        <div class="sc-stats">
+          <div class="sc-stat"><span class="num ${fToday>0?'sc-warn':''}">${fToday}</span><span class="lbl">Due Today</span></div>
+          <div class="sc-stat"><span class="num sc-amber">${f.filter(i=>i.status==='Pending').length}</span><span class="lbl">Pending</span></div>
+          <div class="sc-stat"><span class="num sc-ok">${f.filter(i=>i.status==='Done').length}</span><span class="lbl">Closed</span></div>
+          <div class="sc-stat"><span class="num">${f.filter(i=>i.status==='In Progress').length}</span><span class="lbl">In Progress</span></div>
+        </div>
+        <div class="sc-action">Click to view all follow-ups →</div>
+      </div>
+
+      <div class="sum-card sc-project" onclick="navigateTo('projects')">
+        <div class="sc-head">
+          <div><div class="sc-title">🏆 The Season</div><div class="sc-plain p">Projects · Founder + FO</div></div>
+          <span class="sc-badge b-project">${pActive.length} in flight</span>
+        </div>
+        <div class="sc-stats">
+          <div class="sc-stat"><span class="num ${pCEO>0?'sc-amber':''}">${pCEO}</span><span class="lbl">On CEO</span></div>
+          <div class="sc-stat"><span class="num sc-ok">${p.filter(i=>i.status==='On Track').length}</span><span class="lbl">On Track</span></div>
+          <div class="sc-stat"><span class="num sc-ok">${p.filter(i=>i.status==='Done').length}</span><span class="lbl">Done</span></div>
+          <div class="sc-stat"><span class="num">${p.filter(i=>i.status==='Box Box').length}</span><span class="lbl">Box Box</span></div>
+        </div>
+        <div class="sc-action">Click to view all projects →</div>
+      </div>
+    </div>
+  `;
+}
+
+// ── TASK TABLE ─────────────────────────────────────────────
+function renderTaskTable(items, viewId){
+  const titles={tasks:'The <span class="accent-task">Grid</span>','tasks-overdue':'⚠ <span class="accent-task">Overdue</span>','tasks-done':'Completed <span class="accent-task">Tasks</span>',dept:`<span class="accent-task">${esc(S.filter||'')}</span>`};
+  const subs={tasks:'All Tasks · Department-dependent',  'tasks-overdue':'Follow-up overdue · Needs immediate action','tasks-done':'Closed tasks','dept':'Department filter'};
+  items=items.slice().sort((a,b)=>{const o={'Red Flag':0,'Current Lap':1,'This Race':2,'The Season':3};return (o[a.bucket]||9)-(o[b.bucket]||9)||((a.followup_date||'9')>(b.followup_date||'9')?1:-1);});
+  const s=(document.getElementById('task-search')||{}).value||'';
+  const fi=s?items.filter(i=>(i.title+i.department+i.person_name+i.status).toLowerCase().includes(s.toLowerCase())):items;
+  return `
+    <div class="qc-bar">
+      <span class="qc-label">⚡ Quick Capture</span>
+      <input id="qc-input" class="qc-input" placeholder="Quick add… e.g. Rohit audit file #urgent /finance due:tomorrow" autocomplete="off"/>
+      <span class="qc-fb" id="qc-fb"></span>
+      <span class="qc-hint">↵</span>
+    </div>
+    <div class="page-head head-task">
+      <div><h1>${titles[viewId]||'Tasks'}</h1><div class="page-sub">${subs[viewId]||''}</div></div>
+      <div class="page-meta"><div class="date">${longDate()}</div><div>${fi.length} tasks</div></div>
+    </div>
+    <div class="toolbar">
+      <input id="task-search" class="search-box" placeholder="Search tasks, dept, person…" value="${esc(s)}" oninput="render()"/>
+      <button class="btn btn-amber" onclick="openNewTask()">+ New Task</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th style="width:3%">#</th>
+        <th style="width:30%">Task</th>
+        <th>Department</th>
+        <th>Person</th>
+        <th>Priority</th>
+        <th>Status</th>
+        <th>Start</th>
+        <th>Follow-up</th>
+        <th>Completion</th>
+        <th>Log</th>
+      </tr></thead>
+      <tbody>${fi.length===0?`<tr><td colspan="10"><div class="empty"><div class="big">Grid is clear</div><div class="sm">No tasks match this filter</div></div></td></tr>`:fi.map((item,idx)=>`
+        <tr data-id="${item.id}" data-type="task">
+          <td><span class="pos">P${pad(idx+1)}</span></td>
+          <td class="tc">${esc(item.title)}${item.inbox?'<span class="tag" style="background:rgba(184,61,255,.15);color:var(--followup-color);border:none;margin-left:4px;">INBOX</span>':''}</td>
+          <td><span class="tag tag-dept">${esc(item.department||'—')}</span></td>
+          <td style="font-size:12px;">${esc(item.person_name||'—')}</td>
+          <td>${item.bucket?`<span class="tag-bucket ${bClass(item.bucket)}">${esc(item.bucket)}</span>`:'—'}</td>
+          <td><span class="tag-status ${stClass(item.status)}">${esc(item.status||'—')}</span></td>
+          <td class="due">${fmtDate(item.start_date)}</td>
+          <td>${renderDue(item.followup_date)}</td>
+          <td class="due">${fmtDate(item.completion_date)}</td>
+          <td><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--ink-dim);">${(item.followup_log||[]).length} entries</span></td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+// ── FOLLOW-UP TABLE ────────────────────────────────────────
+function renderFollowupTable(items){
+  const s=(document.getElementById('fu-search')||{}).value||'';
+  const fi=s?items.filter(i=>(i.title+i.department+i.person_name).toLowerCase().includes(s.toLowerCase())):items;
+  fi.sort((a,b)=>(a.followup_date||'9').localeCompare(b.followup_date||'9'));
+  return `
+    <div class="qc-bar">
+      <span class="qc-label">⚡ Quick Capture</span>
+      <input id="qc-input" class="qc-input" placeholder="Quick add follow-up… e.g. /followup Vikas audit file due:tomorrow" autocomplete="off"/>
+      <span class="qc-fb" id="qc-fb"></span>
+      <span class="qc-hint">↵</span>
+    </div>
+    <div class="page-head head-followup">
+      <h1>Pit <span class="accent-fp">Stops</span></h1>
+      <div class="page-meta"><div class="date">${longDate()}</div><div>${fi.length} follow-ups</div></div>
+    </div>
+    <div class="toolbar">
+      <input id="fu-search" class="search-box" placeholder="Search follow-ups, dept, person…" value="${esc(s)}" oninput="render()"/>
+      <button class="btn" style="background:var(--followup-color);color:var(--paper);border-color:var(--followup-color);" onclick="openNewFollowup()">+ New Follow-up</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th style="width:3%">#</th>
+        <th style="width:32%">Follow-up Item</th>
+        <th>Department</th>
+        <th>Person</th>
+        <th>Status</th>
+        <th>Start</th>
+        <th>Follow-up Date</th>
+        <th>Closure</th>
+        <th>Log</th>
+      </tr></thead>
+      <tbody>${fi.length===0?`<tr><td colspan="9"><div class="empty"><div class="big">Pit lane clear</div><div class="sm">No follow-ups match this filter</div></div></td></tr>`:fi.map((item,idx)=>`
+        <tr data-id="${item.id}" data-type="followup">
+          <td><span class="pos">P${pad(idx+1)}</span></td>
+          <td class="tc">${esc(item.title)}${item.linked_task_id?`<div class="sub-text">Linked task</div>`:''}</td>
+          <td><span class="tag tag-dept">${esc(item.department||'—')}</span></td>
+          <td style="font-size:12px;">${esc(item.person_name||'—')}</td>
+          <td><span class="tag-status ${fuStClass(item.status)}">${esc(item.status||'—')}</span></td>
+          <td class="due">${fmtDate(item.start_date)}</td>
+          <td>${renderDue(item.followup_date)}</td>
+          <td class="due">${fmtDate(item.completion_date)}</td>
+          <td><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--ink-dim);">${(item.followup_log||[]).length} entries</span></td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+// ── PROJECT TABLE ──────────────────────────────────────────
+function renderProjectTable(items){
+  const s=(document.getElementById('proj-search')||{}).value||'';
+  const fi=s?items.filter(i=>(i.title+i.owner+i.status).toLowerCase().includes(s.toLowerCase())):items;
+  fi.sort((a,b)=>{const o={'Red Flag':0,'Current Lap':1,'This Race':2,'The Season':3};return (o[a.bucket]||9)-(o[b.bucket]||9)||((a.due_date||'9')>(b.due_date||'9')?1:-1);});
+  return `
+    <div class="qc-bar">
+      <span class="qc-label">⚡ Quick Capture</span>
+      <input id="qc-input" class="qc-input" placeholder="Quick add project… e.g. /project OKR Q1 FY27 #quarterly @CEO" autocomplete="off"/>
+      <span class="qc-fb" id="qc-fb"></span>
+      <span class="qc-hint">↵</span>
+    </div>
+    <div class="page-head head-project">
+      <h1>The <span class="accent-proj">Season</span></h1>
+      <div class="page-meta"><div class="date">${longDate()}</div><div>${fi.length} projects</div></div>
+    </div>
+    <div class="toolbar">
+      <input id="proj-search" class="search-box" placeholder="Search projects, owner, status…" value="${esc(s)}" oninput="render()"/>
+      <button class="btn" style="background:var(--project-color);color:var(--carbon);border-color:var(--project-color);" onclick="openNewProject()">+ New Project</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr>
+        <th style="width:3%">#</th>
+        <th style="width:35%">Project</th>
+        <th>Window</th>
+        <th>Owner</th>
+        <th>Status</th>
+        <th>Start</th>
+        <th>Due</th>
+        <th>Pendency</th>
+        <th>Radio</th>
+      </tr></thead>
+      <tbody>${fi.length===0?`<tr><td colspan="9"><div class="empty"><div class="big">Track clear</div><div class="sm">No projects here</div></div></td></tr>`:fi.map((item,idx)=>`
+        <tr data-id="${item.id}" data-type="project">
+          <td><span class="pos">P${pad(idx+1)}</span></td>
+          <td class="tc">${esc(item.title)}${item.pendency?`<div class="sub-text">⚠ ${esc(item.pendency)}</div>`:''}</td>
+          <td>${item.bucket?`<span class="tag-bucket ${bClass(item.bucket)}">${esc(item.bucket)}</span>`:'—'}</td>
+          <td style="font-size:12px;">${esc(item.owner||'—')}</td>
+          <td><span class="tag-status ${pjStClass(item.status)}">${esc(item.status||'—')}</span></td>
+          <td class="due">${fmtDate(item.start_date)}</td>
+          <td>${renderDue(item.due_date)}</td>
+          <td style="font-size:11.5px;color:var(--ink-dim);max-width:150px;">${esc(trunc(item.pendency||'—',40))}</td>
+          <td><span style="font-family:'JetBrains Mono',monospace;font-size:9.5px;color:var(--ink-dim);">${(item.remarks_json||[]).length} msgs</span></td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+// ============================================================
+//  MODAL — TASK
+// ============================================================
+function openNewTask(){
+  S.editingId=null;
+  const t=document.getElementById('t-title');if(t)t.value='';
+  setVal('t-dept','');setVal('t-person','');setVal('t-bucket','Current Lap');
+  setVal('t-status','Not Started');setVal('t-start',today());
+  setVal('t-followup','');setVal('t-completion','');setVal('t-desc','');
+  document.getElementById('t-delete').style.display='none';
+  document.getElementById('t-log').innerHTML='<div class="empty" style="padding:12px 0;"><div class="sm">No log entries yet. Add the first below.</div></div>';
+  openModal('modal-task');
+  setTimeout(()=>document.getElementById('t-title').focus(),50);
+}
+function openTaskItem(item){
+  S.editingId=item.id;
+  document.getElementById('t-title').value=item.title;
+  setVal('t-dept',item.department||'');setVal('t-person',item.person_name||'');
+  setVal('t-bucket',item.bucket||'Current Lap');setVal('t-status',item.status||'Not Started');
+  setVal('t-start',item.start_date||'');setVal('t-followup',item.followup_date||'');
+  setVal('t-completion',item.completion_date||'');setVal('t-desc',item.description||'');
+  document.getElementById('t-log-author').value=S.role==='ceo'?'CEO':'FO';
+  document.getElementById('t-delete').style.display='inline-block';
+  renderLog('t-log',item.followup_log||[]);
+  openModal('modal-task');
+}
+async function saveTask(){
+  const title=document.getElementById('t-title').value.trim();if(!title){alert('Title required');return;}
+  const data={title,type:'task',department:getVal('t-dept'),person_name:getVal('t-person'),bucket:getVal('t-bucket'),status:getVal('t-status'),start_date:getVal('t-start'),followup_date:getVal('t-followup'),completion_date:getVal('t-completion'),description:getVal('t-desc'),inbox:false};
+  let item;
+  if(S.editingId){item=S.items.find(i=>i.id===S.editingId);Object.assign(item,data);}
+  else{item={id:uid(),...data,followup_log:[],remarks_json:[],owner:'',due_date:'',dependency:'',pendency:'',linked_task_id:'',createdAt:Date.now()};}
+  await upsertItem(item);closeModal('modal-task');
+}
+
+// ============================================================
+//  MODAL — FOLLOW-UP
+// ============================================================
+function openNewFollowup(){
+  S.editingId=null;
+  document.getElementById('f-title').value='';
+  setVal('f-dept','');setVal('f-person','');setVal('f-status','Pending');
+  setVal('f-start',today());setVal('f-followup','');setVal('f-closure','');setVal('f-desc','');
+  populateLinkedTaskSelect('');
+  document.getElementById('f-delete').style.display='none';
+  document.getElementById('f-log').innerHTML='<div class="empty" style="padding:12px 0;"><div class="sm">No log entries yet.</div></div>';
+  openModal('modal-followup');
+  setTimeout(()=>document.getElementById('f-title').focus(),50);
+}
+function openFollowupItem(item){
+  S.editingId=item.id;
+  document.getElementById('f-title').value=item.title;
+  setVal('f-dept',item.department||'');setVal('f-person',item.person_name||'');
+  setVal('f-status',item.status||'Pending');
+  setVal('f-start',item.start_date||'');setVal('f-followup',item.followup_date||'');
+  setVal('f-closure',item.completion_date||'');setVal('f-desc',item.description||'');
+  populateLinkedTaskSelect(item.linked_task_id||'');
+  document.getElementById('f-log-author').value=S.role==='ceo'?'CEO':'FO';
+  document.getElementById('f-delete').style.display='inline-block';
+  renderLog('f-log',item.followup_log||[]);
+  openModal('modal-followup');
+}
+async function saveFollowup(){
+  const title=document.getElementById('f-title').value.trim();if(!title){alert('Title required');return;}
+  const data={title,type:'followup',department:getVal('f-dept'),person_name:getVal('f-person'),status:getVal('f-status'),start_date:getVal('f-start'),followup_date:getVal('f-followup'),completion_date:getVal('f-closure'),description:getVal('f-desc'),linked_task_id:getVal('f-linked'),inbox:false};
+  let item;
+  if(S.editingId){item=S.items.find(i=>i.id===S.editingId);Object.assign(item,data);}
+  else{item={id:uid(),...data,bucket:'',owner:'',due_date:'',dependency:'',pendency:'',followup_log:[],remarks_json:[],createdAt:Date.now()};}
+  await upsertItem(item);closeModal('modal-followup');
+}
+function populateLinkedTaskSelect(currentId){
+  const sel=document.getElementById('f-linked');if(!sel)return;
+  sel.innerHTML='<option value="">— Standalone (no linked task) —</option>'+tasks().map(t=>`<option value="${t.id}"${t.id===currentId?' selected':''}>${esc(trunc(t.title,50))}</option>`).join('');
+}
+
+// ============================================================
+//  MODAL — PROJECT
+// ============================================================
+function openNewProject(){
+  S.editingId=null;
+  document.getElementById('p-title').value='';
+  setVal('p-bucket','Current Lap');setVal('p-owner','Amit (FO)');setVal('p-status','On the Grid');
+  setVal('p-start',today());setVal('p-due','');setVal('p-review','');setVal('p-desc','');
+  setVal('p-dep','');setVal('p-pend','');
+  document.getElementById('p-delete').style.display='none';
+  document.getElementById('p-log').innerHTML='<div class="empty" style="padding:12px 0;"><div class="sm">No messages yet.</div></div>';
+  openModal('modal-project');
+  setTimeout(()=>document.getElementById('p-title').focus(),50);
+}
+function openProjectItem(item){
+  S.editingId=item.id;
+  document.getElementById('p-title').value=item.title;
+  setVal('p-bucket',item.bucket||'Current Lap');setVal('p-owner',item.owner||'Amit (FO)');
+  setVal('p-status',item.status||'On the Grid');setVal('p-start',item.start_date||'');
+  setVal('p-due',item.due_date||'');setVal('p-review',item.review||'');setVal('p-desc',item.description||'');
+  setVal('p-dep',item.dependency||'');setVal('p-pend',item.pendency||'');
+  document.getElementById('p-log-author').value=S.role==='ceo'?'CEO':'FO';
+  document.getElementById('p-delete').style.display='inline-block';
+  renderLog('p-log',item.remarks_json||[]);
+  openModal('modal-project');
+}
+async function saveProject(){
+  const title=document.getElementById('p-title').value.trim();if(!title){alert('Title required');return;}
+  const data={title,type:'project',bucket:getVal('p-bucket'),owner:getVal('p-owner'),status:getVal('p-status'),start_date:getVal('p-start'),due_date:getVal('p-due'),review:getVal('p-review'),description:getVal('p-desc'),dependency:getVal('p-dep'),pendency:getVal('p-pend'),inbox:false};
+  let item;
+  if(S.editingId){item=S.items.find(i=>i.id===S.editingId);Object.assign(item,data);}
+  else{item={id:uid(),...data,department:'',person_name:'',followup_date:'',completion_date:'',linked_task_id:'',followup_log:[],remarks_json:[],createdAt:Date.now()};}
+  await upsertItem(item);closeModal('modal-project');
+}
+
+// ============================================================
+//  FOLLOW-UP LOG / TEAM RADIO
+// ============================================================
+function renderLog(containerId,entries){
+  const c=document.getElementById(containerId);if(!c)return;
+  if(!entries||entries.length===0){c.innerHTML='<div class="empty" style="padding:12px 0;"><div class="sm">No entries yet.</div></div>';return;}
+  c.innerHTML=entries.slice().reverse().map(e=>`
+    <div class="log-entry ${e.author==='CEO'?'from-ceo':'from-fo'}">
+      <div class="log-meta"><span class="auth">${esc(e.author)}</span><span>${new Date(e.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).toUpperCase()}</span></div>
+      <div>${esc(e.text)}</div>
+    </div>`).join('');
+}
+async function addLog(modalType){
+  if(!S.editingId){alert('Save item first');return;}
+  const ids={task:'t-log-text',followup:'f-log-text',project:'p-log-text'};
+  const authorIds={task:'t-log-author',followup:'f-log-author',project:'p-log-author'};
+  const containerIds={task:'t-log',followup:'f-log',project:'p-log'};
+  const text=document.getElementById(ids[modalType]).value.trim();if(!text)return;
+  const author=document.getElementById(authorIds[modalType]).value;
+  const item=S.items.find(i=>i.id===S.editingId);if(!item)return;
+  const entry={author,text,ts:Date.now()};
+  if(modalType==='project'){item.remarks_json=[...(item.remarks_json||[]),entry];}
+  else{item.followup_log=[...(item.followup_log||[]),entry];}
+  document.getElementById(ids[modalType]).value='';
+  renderLog(containerIds[modalType],modalType==='project'?item.remarks_json:item.followup_log);
+  await upsertItem(item,true);
+}
+
+// ============================================================
+//  DELETE
+// ============================================================
+async function deleteCurrentItem(modalId){
+  if(!S.editingId)return;
+  const item=S.items.find(i=>i.id===S.editingId);
+  const type=item?item.type:'item';
+  if(!confirm(`Remove this ${type}?`))return;
+  const id=S.editingId;closeModal(modalId);await removeItem(id);
+}
+
+// ============================================================
+//  DEPT MANAGEMENT
+// ============================================================
+function openAddDept(){document.getElementById('adddept-name').value='';openModal('modal-adddept');setTimeout(()=>document.getElementById('adddept-name').focus(),50);}
+async function saveNewDept(){
+  const name=document.getElementById('adddept-name').value.trim();
+  if(!name){alert('Name required');return;}
+  if(allDepts().some(d=>d.toLowerCase()===name.toLowerCase())){alert('Already exists');return;}
+  S.customDepts.push(name);persistCache();closeModal('modal-adddept');render();await pushCustomDepts();
+}
+function openManageDepts(){renderDeptList();openModal('modal-managedepts');}
+function renderDeptList(){
+  const c=document.getElementById('dept-list');if(!c)return;
+  c.innerHTML=allDepts().map(d=>{
+    const isCore=CORE_DEPTS.includes(d);
+    const cnt=tasks().filter(i=>i.department===d).length;
+    if(isCore)return`<div class="dept-row"><div><div>${esc(d)}</div><div style="font-size:10px;color:var(--ink-dim);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">${cnt} tasks</div></div><span class="core-badge">Core</span></div>`;
+    return`<div class="dept-row"><div><div>${esc(d)}</div><div style="font-size:10px;color:var(--ink-dim);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">${cnt} tasks · Custom</div></div><div class="dept-row-actions"><button class="btn btn-sm" onclick="renameDept('${esc(d).replace(/'/g,"\\'")}')">Rename</button><button class="btn btn-sm btn-danger" onclick="deleteDept('${esc(d).replace(/'/g,"\\'")}')">Remove</button></div></div>`;
+  }).join('');
+}
+async function renameDept(old){
+  const n=prompt('Rename department',old);if(!n||!n.trim()||n.trim()===old)return;
+  const trimmed=n.trim();if(allDepts().some(d=>d.toLowerCase()===trimmed.toLowerCase())){alert('Already exists');return;}
+  S.customDepts=S.customDepts.map(d=>d===old?trimmed:d);
+  const updated=S.items.filter(i=>i.department===old);updated.forEach(i=>i.department=trimmed);
+  persistCache();renderDeptList();render();await pushCustomDepts();for(const i of updated)await upsertItem(i,true);
+}
+async function deleteDept(name){
+  const cnt=S.items.filter(i=>i.department===name).length;
+  if(cnt>0){if(!confirm(`"${name}" has ${cnt} tasks. Remove dept and clear from those tasks?`))return;S.items.filter(i=>i.department===name).forEach(i=>i.department='');}
+  else{if(!confirm(`Remove department "${name}"?`))return;}
+  S.customDepts=S.customDepts.filter(d=>d!==name);persistCache();renderDeptList();render();await pushCustomDepts();
+}
+
+// ============================================================
+//  DEPT SELECT POPULATION
+// ============================================================
+function repopulateDeptSelects(){
+  ['t-dept','f-dept'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel)return;
+    const cur=sel.value;
+    sel.innerHTML='<option value="">— Select Department —</option>'+allDepts().map(d=>`<option value="${esc(d)}">${esc(d)}</option>`).join('');
+    if(cur)sel.value=cur;
+  });
+}
+
+// ============================================================
+//  NAV
+// ============================================================
+function navigateTo(view,filter){
+  S.view=view;S.filter=filter||null;
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  const el=document.querySelector(`[data-view="${view}"]${filter?`[data-filter="${filter}"]`:''}`);
+  if(el)el.classList.add('active');
+  render();
+}
+function attachNavClicks(){
+  document.querySelectorAll('[data-view]').forEach(el=>{
+    el.onclick=()=>{
+      document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+      el.classList.add('active');
+      S.view=el.dataset.view;S.filter=el.dataset.filter||null;
+      render();
+    };
+  });
+}
+function attachClicks(){
+  // Table rows
+  document.querySelectorAll('tr[data-id][data-type], .overdue-row[data-id][data-type]').forEach(el=>{
+    el.onclick=()=>{
+      const item=S.items.find(i=>i.id===el.dataset.id);if(!item)return;
+      if(item.type==='task')openTaskItem(item);
+      else if(item.type==='followup')openFollowupItem(item);
+      else if(item.type==='project')openProjectItem(item);
+    };
+  });
+  // Summary cards handled by onclick in HTML
+}
+function attachQC(){
+  const inp=document.getElementById('qc-input');if(!inp)return;
+  inp.onkeydown=async(e)=>{if(e.key==='Enter'){e.preventDefault();await submitQC();}};
+}
+
+// ============================================================
+//  MODAL HELPERS
+// ============================================================
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');S.editingId=null;}
+
+// ============================================================
+//  SETTINGS
+// ============================================================
+function openSettings(){
+  document.getElementById('set-url').value=S.settings.sheetsUrl||'';
+  document.getElementById('set-interval').value=String(S.settings.syncInterval||10);
+  openModal('modal-settings');
+}
+async function saveSettings(){
+  S.settings.sheetsUrl=document.getElementById('set-url').value.trim();
+  S.settings.syncInterval=parseInt(document.getElementById('set-interval').value)||10;
+  saveSettings2Storage();closeModal('modal-settings');startSyncTimer();
+  if(S.settings.sheetsUrl){setSyncStatus('connecting','CONNECTING…');await syncTick();}
+}
+
+// ============================================================
+//  EXPORT / IMPORT
+// ============================================================
+function exportData(){
+  const blob=new Blob([JSON.stringify({items:S.items,customDepts:S.customDepts,exportedAt:new Date().toISOString(),version:'v5'},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`nrpl-race-control-${new Date().toISOString().split('T')[0]}.json`;a.click();URL.revokeObjectURL(a.href);
+}
+function importData(){
+  const inp=document.createElement('input');inp.type='file';inp.accept='.json';
+  inp.onchange=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=async ev=>{
+      try{
+        const p=JSON.parse(ev.target.result);if(!p.items){alert('Invalid format');return;}
+        if(!confirm(`Replace ${S.items.length} items with ${p.items.length}?`))return;
+        S.items=p.items;if(p.customDepts)S.customDepts=p.customDepts;
+        persistCache();render();await postSheets('replace_all',{items:S.items,customDepts:S.customDepts});
+      }catch(err){alert('Parse error: '+err.message);}
+    };r.readAsText(f);
+  };inp.click();
+}
+
+// ============================================================
+//  GLOSSARY
+// ============================================================
+function toggleGlossary(){document.getElementById('glo-panel').classList.toggle('open');}
+document.addEventListener('click',e=>{
+  const p=document.getElementById('glo-panel');const b=document.querySelector('.glo-btn');
+  if(p&&p.classList.contains('open')&&!p.contains(e.target)&&e.target!==b)p.classList.remove('open');
+});
+
+// ============================================================
+//  UTILITY
+// ============================================================
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function trunc(s,n){s=String(s||'');return s.length>n?s.slice(0,n)+'…':s;}
+function pad(n){return String(n).padStart(2,'0');}
+function today(){return new Date().toISOString().split('T')[0];}
+function startOfToday(){const d=new Date();d.setHours(0,0,0,0);return d;}
+function longDate(){return new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).toUpperCase();}
+function timeStr(){return new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false});}
+function greeting(){const h=new Date().getHours();return h<12?'morning':h<17?'afternoon':'evening';}
+function fmtDate(s){if(!s)return '—';try{return new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}).toUpperCase();}catch{return s;}}
+function renderDue(d){
+  if(!d)return '<span class="due">—</span>';
+  const dt=new Date(d),t=startOfToday(),diff=Math.floor((dt-t)/86400000);
+  if(diff<0)return`<span class="due ov">${Math.abs(diff)}d overdue</span>`;
+  if(diff===0)return`<span class="due today">TODAY</span>`;
+  if(diff===1)return`<span class="due today">+1d</span>`;
+  if(diff<=7)return`<span class="due">+${diff}d</span>`;
+  return`<span class="due">${fmtDate(d)}</span>`;
+}
+function bClass(b){return{'Red Flag':'bk-red','Current Lap':'bk-lap','This Race':'bk-race','The Season':'bk-season'}[b]||'';}
+function stClass(s){return{'Not Started':'st-ns','In Progress':'st-ip','Follow-up Due':'st-fu','Overdue':'st-ov','Done':'st-done'}[s]||'st-ns';}
+function fuStClass(s){return{'Pending':'st-pend','In Progress':'st-ip','Done':'st-done'}[s]||'st-pend';}
+function pjStClass(s){return{'On the Grid':'st-ns','On Track':'st-ip','Box Box':'st-fu','Done':'st-done'}[s]||'st-ns';}
+function getVal(id){const el=document.getElementById(id);return el?el.value:'';}
+function setVal(id,v){const el=document.getElementById(id);if(el)el.value=v;}
+
+// ============================================================
+//  ROLE SWITCH
+// ============================================================
+document.querySelectorAll('.role-btn').forEach(btn=>{
+  btn.onclick=()=>{document.querySelectorAll('.role-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');S.role=btn.dataset.role;render();};
+});
+
+// ============================================================
+//  INIT
+// ============================================================
+(async()=>{
+  loadSettings();loadLocalCache();render();
+  if(!S.settings.sheetsUrl){setSyncStatus('offline','NOT CONFIGURED · ⚙ Settings');setTimeout(()=>{if(!S.settings.sheetsUrl)openSettings();},600);}
+  else{setSyncStatus('connecting','CONNECTING…');await syncTick();if(S.pendingChanges.length)await flushPending();}
+  startSyncTimer();
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){['modal-task','modal-followup','modal-project','modal-adddept','modal-managedepts','modal-settings'].forEach(id=>{const m=document.getElementById(id);if(m)m.classList.remove('open');});S.editingId=null;}
+    if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();const q=document.getElementById('qc-input');if(q)q.focus();}
+  });
+})();
+</script>
+</body>
+</html>

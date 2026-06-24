@@ -977,7 +977,7 @@ function renderTaskTable(items, viewId){
       <div class="page-meta"><div class="date">${longDate()}</div><div>${fi.length} tasks</div></div>
     </div>
     <div class="toolbar">
-      <input id="task-search" class="search-box" placeholder="Search tasks, dept, person…" value="${esc(s)}" oninput="render()"/>
+      <input id="task-search" class="search-box" placeholder="Search tasks, dept, person…" value="${esc(s)}" oninput="debouncedRender(this)"/>
       <button class="btn btn-amber" onclick="openNewTask()">+ New Task</button>
     </div>
     <div class="table-wrap"><table>
@@ -1027,7 +1027,7 @@ function renderFollowupTable(items){
       <div class="page-meta"><div class="date">${longDate()}</div><div>${fi.length} follow-ups</div></div>
     </div>
     <div class="toolbar">
-      <input id="fu-search" class="search-box" placeholder="Search follow-ups, dept, person…" value="${esc(s)}" oninput="render()"/>
+      <input id="fu-search" class="search-box" placeholder="Search follow-ups, dept, person…" value="${esc(s)}" oninput="debouncedRender(this)"/>
       <button class="btn" style="background:var(--followup-color);color:var(--paper);border-color:var(--followup-color);" onclick="openNewFollowup()">+ New Follow-up</button>
     </div>
     <div class="table-wrap"><table>
@@ -1075,7 +1075,7 @@ function renderProjectTable(items){
       <div class="page-meta"><div class="date">${longDate()}</div><div>${fi.length} projects</div></div>
     </div>
     <div class="toolbar">
-      <input id="proj-search" class="search-box" placeholder="Search projects, owner, status…" value="${esc(s)}" oninput="render()"/>
+      <input id="proj-search" class="search-box" placeholder="Search projects, owner, status…" value="${esc(s)}" oninput="debouncedRender(this)"/>
       <button class="btn" style="background:var(--project-color);color:var(--carbon);border-color:var(--project-color);" onclick="openNewProject()">+ New Project</button>
     </div>
     <div class="table-wrap"><table>
@@ -1426,6 +1426,20 @@ document.querySelectorAll('.role-btn').forEach(btn=>{
   btn.onclick=()=>{document.querySelectorAll('.role-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');S.role=btn.dataset.role;render();};
 });
 
+
+// ============================================================
+//  DEBOUNCED SEARCH
+// ============================================================
+let _searchTimer=null;
+function debouncedRender(inputEl){
+  const id=inputEl.id;const val=inputEl.value;
+  clearTimeout(_searchTimer);
+  _searchTimer=setTimeout(()=>{
+    render();
+    const restored=document.getElementById(id);
+    if(restored){restored.focus();restored.setSelectionRange(restored.value.length,restored.value.length);}
+  },200);
+}
 // ============================================================
 //  INIT
 // ============================================================
